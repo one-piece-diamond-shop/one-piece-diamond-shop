@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#080d18">
+<title>ONE PIECE LEGENDS | Diamond Store</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="ambient ambient-one"></div>
+<div class="ambient ambient-two"></div>
+
+<main class="wrap">
+
+<header class="hero">
+    <div class="brand-mark">☠</div>
+    <div class="brand-text">
+        <div class="eyebrow">THE GRAND LINE</div>
+        <h1>ONE PIECE <span>LEGENDS</span></h1>
+        <p>فروشگاه رسمی الماس بازی</p>
+    </div>
+</header>
+
+<section class="welcome">
+    <div class="welcome-content">
+        <span class="badge">💎 DIAMOND STORE</span>
+        <h2>ماجراجویی تو از اینجا قوی‌تر می‌شود!</h2>
+        <p>بسته الماس مورد نظرت را انتخاب کن و به دنیای افسانه‌ای وان‌پیس برگرد.</p>
+    </div>
+    <div class="welcome-gem">💎</div>
+</section>
+
+<section class="panel">
+
+    <div class="section-title">
+        <span class="title-icon">🏴‍☠️</span>
+        <div>
+            <h2>اطلاعات بازیکن</h2>
+            <p>شناسه بازی خودت را وارد کن</p>
+        </div>
+    </div>
+
+    <label for="gameId">GAME ID</label>
+    <input id="gameId" type="number" min="1"
+           placeholder="شناسه عددی بازی"
+           inputmode="numeric">
+
+    <div class="section-title package-title">
+        <span class="title-icon">💎</span>
+        <div>
+            <h2>انتخاب بسته الماس</h2>
+            <p>بسته مورد نظرت را انتخاب کن</p>
+        </div>
+    </div>
+
+    <div class="packages">
+        {% for key, p in packages.items() %}
+        <button class="pack" data-package="{{ key }}">
+            <span class="gem">💎</span>
+            <strong>{{ "{:,}".format(p.diamonds) }}</strong>
+            <small>الماس</small>
+            <b>{{ "{:,}".format(p.price) }} تومان</b>
+            <span class="pack-label">انتخاب بسته</span>
+        </button>
+        {% endfor %}
+    </div>
+
+    <button id="buy" class="buy">
+        <span>ثبت سفارش</span>
+        <span>←</span>
+    </button>
+
+    <p class="hint">نسخه آزمایشی فروشگاه؛ پرداخت واقعی هنوز فعال نیست.</p>
+
+    <div id="result" class="result" hidden></div>
+</section>
+
+<section class="panel tracking">
+
+    <div class="section-title">
+        <span class="title-icon">🔎</span>
+        <div>
+            <h2>پیگیری سفارش</h2>
+            <p>وضعیت سفارش خودت را بررسی کن</p>
+        </div>
+    </div>
+
+    <label for="trackId">شماره سفارش</label>
+    <input id="trackId" type="text"
+           placeholder="شماره سفارش را وارد کن">
+
+    <button id="track" class="track-button">
+        بررسی وضعیت سفارش
+    </button>
+
+    <div id="trackResult" class="result" hidden></div>
+</section>
+
+<footer>
+    <div class="footer-logo">☠ ONE PIECE LEGENDS</div>
+    <p>DIAMOND STORE · THE GRAND LINE</p>
+    <span>ساخته‌شده برای ماجراجویان دنیای وان‌پیس</span>
+</footer>
+
+</main>
+
+<script>
+let selected = null;
+
+const result = document.getElementById("result");
+const buy = document.getElementById("buy");
+
+document.querySelectorAll(".pack").forEach(button => {
+    button.addEventListener("click", () => {
+        document.querySelectorAll(".pack").forEach(item => {
+            item.classList.remove("selected");
+        });
+
+        button.classList.add("selected");
+        selected = button.dataset.package;
+    });
+});
+
+buy.addEventListener("click", async () => {
+    const gameId = document.getElementById("gameId").value.trim();
+
+    if (!gameId || Number(gameId) <= 0 || !selected) {
+        alert("ابتدا شناسه بازی و بسته الماس را انتخاب کن.");
+        return;
+    }
+
+    buy.disabled = true;
+    buy.querySelector("span:first-child").textContent = "در حال ثبت سفارش...";
+
+    try {
+        const response = await fetch("/api/orders", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                game_id: gameId,
+                package: selected
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.error || "خطا در ثبت سفارش");
+
+        result.hidden = false;
+        result.innerHTML = `
+            <div class="success-title">✅ سفارش ثبت شد</div>
+            <div class="order-info">
+                <p>شماره سفارش: <code>${data.order_id}</code></p>
+                <p>شناسه بازی: ${data.game_id}</p>
+                <p>الماس: ${data.diamonds.toLocaleString("fa-IR")}</p>
+                <p>مبلغ نمایشی: ${Number(data.amount).toLocaleString("fa-IR")} تومان</p>
+                <p class="waiting">⏳ سفارش ثبت شد؛ پرداخت واقعی هنوز فعال نشده است.</p>
+            </div>
+            <button class="copy-button" id="copyOrder">کپی شماره سفارش</button>
+        `;
+
+        document.getElementById("copyOrder").onclick = async () => {
+            await navigator.clipboard.writeText(data.order_id);
+            alert("شماره سفارش کپی شد.");
+        };
+
+        document.getElementById("trackId").value = data.order_id;
+
+    } catch(error) {
+        alert(error.message);
+    } finally {
+        buy.disabled = false;
+        buy.querySelector("span:first-child").textContent = "ثبت سفارش";
+    }
+});
+
+document.getElementById("track").addEventListener("click", async () => {
+    const id = document.getElementById("trackId").value.trim();
+    const box = document.getElementById("trackResult");
+
+    if (!id || !/^[A-Fa-f0-9]+$/.test(id)) {
+        alert("شماره سفارش معتبر وارد کن.");
+        return;
+    }
+
+    box.hidden = false;
+    box.textContent = "در حال بررسی...";
+
+    try {
+        const response = await fetch("/api/orders/" + encodeURIComponent(id));
+        const data = await response.json();
+
+        if (!response.ok) throw new Error("سفارش پیدا نشد.");
+
+        const statuses = {
+            pending: ["⏳", "در انتظار پرداخت"],
+            paid: ["💳", "پرداخت تأیید شده؛ در انتظار تحویل"],
+            delivered: ["✅", "الماس با موفقیت تحویل شد"]
+        };
+
+        const status = statuses[data.status] || ["❔", "وضعیت نامشخص"];
+
+        box.innerHTML = `
+            <div class="success-title">${status[0]} ${status[1]}</div>
+            <div class="order-info">
+                <p>شماره سفارش: <code>${data.id}</code></p>
+                <p>شناسه بازی: ${data.game_id}</p>
+                <p>الماس: ${data.diamonds.toLocaleString("fa-IR")}</p>
+                <p>مبلغ: ${Number(data.amount).toLocaleString("fa-IR")} تومان</p>
+            </div>
+        `;
+
+    } catch(error) {
+        box.textContent = error.message;
+    }
+});
+</script>
+
+</body>
+</html>
